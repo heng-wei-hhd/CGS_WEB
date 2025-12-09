@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Green space map{% endblock %}
+
+{% block body %}
+  <h2>绿地质量与健康</h2>
+
+  <form id="search-form">
+    <label>Postcode:
+      <input type="text" name="postcode" id="postcode">
+    </label>
+    <button type="submit">查询</button>
+  </form>
+
+  <div id="mapid" style="height: 500px; margin-top: 1rem;"></div>
+{% endblock %}
+
+{% block scripts %}
+  <!-- 先定义一个全局变量，把 API 的实际 URL 填进去 -->
+  <script>
+    window.GREENSAPCE_API_URL = "{{ url_for('api_greenspace') }}";
+  </script>
+
+  <!-- 再加载真正的地图逻辑 -->
+  <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+{% endblock %}
