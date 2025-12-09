@@ -4,7 +4,9 @@ import oracledb
 app = Flask(__name__)
 
 def get_db_connection():
-    conn = oracledb.connect("user/password@geoslearn", config_dir="/etc/")
+    # 格式说明： "用户名/密码@数据库名"
+    # config_dir="/etc/" 是学校服务器特有的配置，不要删除
+    conn = oracledb.connect("s2677882/weiheng0502@@geoslearn", config_dir="/etc/") 
     return conn
 
 @app.route("/")
@@ -46,6 +48,38 @@ def api_greenspace():
         "features": features
     })
 
+# ... (上面的代码保持不变) ...
+
 if __name__ == "__main__":
-    # 本地用 geos-flask 调试时可以用
+    # === 临时测试代码开始 ===
+    try:
+        print("正在尝试连接数据库并查询数据...")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 执行组员提供的查询命令
+        # 注意：这里我们只取前 5 行 (fetchmany(5)) 看看样子，避免数据太多刷屏
+        sql = "Select * from s2891816.OPEN_SPACE_AUDIT_DATA"
+        cursor.execute(sql)
+        
+        rows = cursor.fetchmany(5)
+        
+        print("--- 查询成功！以下是前5条数据 ---")
+        for row in rows:
+            print(row)
+        print("--------------------------------")
+        
+        # 顺便打印一下列名（表头），这对后面写代码很有帮助
+        print("列名（表头）如下：")
+        for description in cursor.description:
+            print(description[0])
+            
+        cursor.close()
+        conn.close()
+        
+    except Exception as e:
+        print("发生错误:", e)
+    # === 临时测试代码结束 ===
+
+    # 启动 Flask 网站
     app.run(debug=True)
