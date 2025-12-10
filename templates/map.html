@@ -1,26 +1,201 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edinburgh Health & Greenspace Analytics</title>
 
-{% block title %}Green space map{% endblock %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 
-{% block body %}
-  <h2>绿地质量与健康</h2>
+    <style>
+        /* Reset browser margins */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+        }
 
-  <form id="search-form">
-    <label>Postcode:
-      <input type="text" name="postcode" id="postcode">
-    </label>
-    <button type="submit">查询</button>
-  </form>
+        /* Flex Layout Container */
+        .layout-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
 
-  <div id="mapid" style="height: 500px; margin-top: 1rem;"></div>
-{% endblock %}
+        /* Sidebar Styling */
+        #sidebar {
+            width: 340px;
+            background: #f8f9fa;
+            border-right: 1px solid #ddd;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1001; /* Ensure above map */
+        }
 
-{% block scripts %}
-  <!-- 先定义一个全局变量，把 API 的实际 URL 填进去 -->
-  <script>
-    window.GREENSAPCE_API_URL = "{{ url_for('api_greenspace') }}";
-  </script>
+        /* Map Container */
+        #mapid {
+            flex: 1; /* Take remaining width */
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+            background: #e0e0e0;
+        }
 
-  <!-- 再加载真正的地图逻辑 -->
-  <script src="{{ url_for('static', filename='js/map.js') }}"></script>
-{% endblock %}
+        /* Sidebar Elements */
+        .control-group { margin-bottom: 25px; }
+        h2 { color: #2c3e50; margin-top: 0; margin-bottom: 5px; }
+        h4 { color: #34495e; margin-bottom: 12px; font-weight: 600; }
+        .subtitle { color: #7f8c8d; font-size: 0.9em; display: block; margin-bottom: 15px; }
+        
+        /* Checkbox & Legend Styling */
+        .quantile-label { 
+            display: flex; 
+            align-items: center; 
+            margin-bottom: 10px; 
+            cursor: pointer; 
+            font-size: 0.95em;
+            color: #555;
+        }
+        .color-box { 
+            display: inline-block; 
+            width: 16px; 
+            height: 16px; 
+            margin-right: 12px; 
+            border-radius: 3px; 
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        /* Select Dropdown */
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 0.95em;
+            background: white;
+        }
+
+        /* Buttons */
+        .btn-download {
+            width: 100%;
+            padding: 12px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+            font-weight: 600;
+        }
+        .btn-download:hover { background: #34495e; }
+        
+        .btn-nav {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: #27ae60;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+        .btn-nav:hover { background: #219150; }
+
+        /* Dashboard Content */
+        #info-content {
+            background: white;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout-container">
+    
+    <div id="sidebar">
+        <div>
+            <h2>Data Analysis Dashboard</h2>
+            <span class="subtitle">Edinburgh Greenspace & Health Inequalities</span>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 5px 0 20px 0;">
+
+        <div class="control-group">
+            <h4>1. Select Metric</h4>
+            <select id="dataset-selector">
+                <option value="health">🏥 Mental Health Index</option>
+                <option value="simd">📉 SIMD Rank (Deprivation)</option>
+                <option value="stress">⚠️ Stress Index (GWR)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <h4>2. Filter Layers (Quantiles)</h4>
+            <div style="background: white; padding: 15px; border: 1px solid #eee; border-radius: 6px;">
+                <label class="quantile-label">
+                    <input type="checkbox" class="quantile-filter" value="1" checked> 
+                    <span class="color-box" style="background:#d73027;"></span> 0% - 25% (Lowest/Poor)
+                </label>
+                <label class="quantile-label">
+                    <input type="checkbox" class="quantile-filter" value="2" checked>
+                    <span class="color-box" style="background:#fc8d59;"></span> 25% - 50% (Low-Mid)
+                </label>
+                <label class="quantile-label">
+                    <input type="checkbox" class="quantile-filter" value="3" checked>
+                    <span class="color-box" style="background:#91cf60;"></span> 50% - 75% (High-Mid)
+                </label>
+                <label class="quantile-label">
+                    <input type="checkbox" class="quantile-filter" value="4" checked>
+                    <span class="color-box" style="background:#1a9850;"></span> 75% - 100% (Highest/Good)
+                </label>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 10px 0 20px 0;">
+
+        <div id="details-panel" style="flex-grow: 1;">
+            <h4>📍 Area Details</h4>
+            <div id="info-content">
+                <i>Click on a coloured area on the map to view detailed statistics and recommendations...</i>
+            </div>
+            
+            <div id="nav-container" style="display: none;">
+                <a id="nav-btn" href="#" target="_blank" class="btn-nav">
+                    🗺️ Navigate to Quality Greenspace
+                </a>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button onclick="downloadCSV()" class="btn-download">📥 Download Data (CSV)</button>
+        </div>
+    </div>
+
+    <div id="mapid"></div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+<script>
+    window.API_GREENSPACES = "{{ url_for('api_greenspaces') }}";
+    window.API_NEIGHBOURHOODS = "{{ url_for('api_neighbourhoods') }}";
+</script>
+
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+
+</body>
+</html>

@@ -1,33 +1,28 @@
 from flask import Flask, render_template, jsonify, request
 import oracledb
+import json
 
 app = Flask(__name__)
 
+# ⚠️ Remember to update credentials with your real username/password
 def get_db_connection():
-    # 格式说明： "用户名/密码@数据库名"
-    # config_dir="/etc/" 是学校服务器特有的配置，不要删除
-    conn = oracledb.connect("s2677882/weiheng0502@@geoslearn", config_dir="/etc/") 
+    conn = oracledb.connect("s2677882/weiheng0502@@geoslearn", config_dir="/etc/")
     return conn
 
 @app.route("/")
 def index():
     return render_template("map.html")
 
-@app.route("/api/greenspace")
-def api_greenspace():
-    postcode = request.args.get("postcode")
-
+# API 1: Get Greenspace Data (Points)
+@app.route("/api/greenspaces")
+def api_greenspaces():
     conn = get_db_connection()
     cur = conn.cursor()
-
-    sql = """
-        SELECT id, name, quality_score,
-               SDO_UTIL.TO_GEOJSON(geom) as geojson
-        FROM greenspace
-        WHERE postcode = :pc
-    """
-    cur.execute(sql, pc=postcode)
-
+    
+    # Query facilities as well
+    sql = "SELECT id, name, type, quality_score, lat, lon, facilities FROM MOCK_GREENSPACES"
+    cur.execute(sql)
+    
     features = []
     for row in cur:
         features.append({
@@ -35,51 +30,58 @@ def api_greenspace():
             "properties": {
                 "id": row[0],
                 "name": row[1],
-                "quality": row[2],
+                "type": row[2],
+                "quality": row[3],
+                "facilities": row[6]
             },
-            "geometry": row[3]   # 假设已经是 GeoJSON 字符串或 dict
+            "geometry": {
+                "type": "Point",
+                "coordinates": [row[5], row[4]]  # GeoJSON is [Lon, Lat]
+            }
         })
+    
+    cur.close()
+    conn.close()
+    return jsonify({"type": "FeatureCollection", "features": features})
+
+# API 2: Get Neighbourhood Data (Polygons)
+@app.route("/api/neighbourhoods")
+def api_neighbourhoods():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Query extra attributes: stress_index, population
+    sql = """
+        SELECT id, name, health_index, simd_rank, geojson_text, 
+               stress_index, population, center_lat, center_lon 
+        FROM MOCK_NEIGHBOURHOODS
+    """
+    cur.execute(sql)
+    
+    features = []
+    for row in cur:
+        # row[4] is CLOB, needs read()
+        geom_str = row[4].read() if row[4] else None
+        if geom_str:
+            geometry = json.loads(geom_str)
+            features.append({
+                "type": "Feature",
+                "properties": {
+                    "id": row[0],
+                    "name": row[1],
+                    "health": row[2],
+                    "simd": row[3],
+                    "stress": row[5],
+                    "pop": row[6],
+                    "lat": row[7],
+                    "lon": row[8]
+                },
+                "geometry": geometry
+            })
 
     cur.close()
     conn.close()
-
-    return jsonify({
-        "type": "FeatureCollection",
-        "features": features
-    })
-
-# ... (上面的代码保持不变) ...
+    return jsonify({"type": "FeatureCollection", "features": features})
 
 if __name__ == "__main__":
-    # === 临时测试代码开始 ===
-    try:
-        print("正在尝试连接数据库并查询数据...")
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 执行组员提供的查询命令
-        # 注意：这里我们只取前 5 行 (fetchmany(5)) 看看样子，避免数据太多刷屏
-        sql = "Select * from s2891816.OPEN_SPACE_AUDIT_DATA"
-        cursor.execute(sql)
-        
-        rows = cursor.fetchmany(5)
-        
-        print("--- 查询成功！以下是前5条数据 ---")
-        for row in rows:
-            print(row)
-        print("--------------------------------")
-        
-        # 顺便打印一下列名（表头），这对后面写代码很有帮助
-        print("列名（表头）如下：")
-        for description in cursor.description:
-            print(description[0])
-            
-        cursor.close()
-        conn.close()
-        
-    except Exception as e:
-        print("发生错误:", e)
-    # === 临时测试代码结束 ===
-
-    # 启动 Flask 网站
     app.run(debug=True)

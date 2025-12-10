@@ -1,29 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <title>{% block title %}Green Space & Health{% endblock %}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Edinburgh Greenspace Map{% endblock %}</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS50bTRR9BMY="
+     crossorigin=""/>
 
-  <!-- 自己的样式 -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* 防止出现双滚动条 */
+        }
+        /* 针对新的侧边栏布局优化 */
+        * {
+            box-sizing: border-box;
+        }
+    </style>
 
-  {% block head_extra %}{% endblock %}
+    {% block styles %}{% endblock %}
 </head>
 <body>
-  {% block body %}{% endblock %}
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""></script>
+    {% block body %}{% endblock %}
 
-  <!-- 自己的 JS（注意顺序：先定义全局变量再加载 map.js） -->
-  {% block scripts %}{% endblock %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>
